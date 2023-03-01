@@ -1,0 +1,344 @@
+---
+title: "ALA data analyst interview"
+author: "Lu-Yi Wang"
+date: "2023-02-28"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+subtitle: Techanical test
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "docs") })
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r Load R libraries, include = FALSE}
+library(xaringanExtra) # for the clipboard
+library(dplyr)
+library(ggplot2)
+library(ozmaps)
+library(pander)
+```
+
+```{r Set up clipboard, include = FALSE}
+htmltools::tagList(
+  xaringanExtra::use_clipboard(
+    button_text = "<i class=\"fa fa-clipboard\"></i>",
+    success_text = "<i class=\"fa fa-check\" style=\"color: #90BE6D\"></i>",
+  ),
+  rmarkdown::html_dependency_font_awesome()
+)
+```
+
+Here, I select data including record type, spatial, temporal, and taxonomic information for the analyses.
+
+```{r Import data}
+dat.raw <- read.csv("data/records-2023-02-28.csv", header = TRUE) %>% 
+  select(basisOfRecord, year, month, day, decimalLatitude, decimalLongitude, scientificName, kingdom, phylum, class, order, family, genus, subgenus, species, taxonRank)
+```
+
+Additionally, I excluded material samples and preserved specimens to investigate the occurrence in the field.
+
+```{r}
+dat.raw %>% 
+  count(basisOfRecord) %>% 
+  rename("Record type" = "basisOfRecord", "Number of records" = "n") %>% 
+  pander()
+```
+
+# Data overview 
+
+```{r}
+dat <- dat.raw %>% 
+  filter(!grepl('MATERIAL_SAMPLE|PRESERVED_SPECIMEN', basisOfRecord)) %>% 
+  mutate(season = case_when(               # create a season column
+    month %in% c(12, 1, 2) ~ "summer",
+    month %in% c(3, 4, 5) ~ "fall",
+    month %in% c(6, 7, 8) ~ "winter",
+    month %in% c(9, 10, 11) ~ "spring"))
+```
+
+```{r}
+# There are blanks in the taxonomic columns that can not be removed as NA
+dat.table <- dat %>%
+  filter(!order == "" &
+           !family == "" &
+           !genus == "") 
+```
+
+In this dataset, 
+
+1. the data span from year `r min(dat$year, na.rm = TRUE)` to `r max(dat$year, na.rm = TRUE)` (`r max(dat$year, na.rm = TRUE)-min(dat$year, na.rm = TRUE)+1` years in total).
+2. there are `r length(unique(na.omit(dat.table$order)))` orders, `r length(unique(na.omit(dat.table$family)))` families, `r length(unique(na.omit(dat.table$genus)))` genera, and `r length(unique(na.omit(dat.table$species)))` species.
+3. there are `r length(dat$basisOfRecord)` observations, but `r sum(is.na(dat$month))` of them do not have temporal information.
+
+```{r}
+tibble(Taxonomic_rank = c("order", "family", "genus", "species"),
+       number = c(length(unique(na.omit(dat.table$order))), 
+                  length(unique(na.omit(dat.table$family))), 
+                  length(unique(na.omit(dat.table$genus))), 
+                  length(unique(na.omit(dat.table$species))))) %>% 
+  pander()
+```
+
+# Data exploration
+
+## Occurance overtime {.tabset .tabset-fade .tabset-pills}
+
+```{r}
+dat$season <- factor(dat$season, levels = c("spring", "summer", "fall", "winter"))
+dat$month <- factor(dat$month, levels = 1:12)
+dat$year <- factor(dat$year)
+```
+
+### Monthly occurance
+
+```{r}
+dat %>%
+  filter(!is.na(month)) %>% 
+  group_by(month) %>%
+  summarise(n = length(basisOfRecord)) %>% 
+  ggplot(aes(x = month, y = n)) +
+  geom_bar(stat = "identity", fill = "gold") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  labs(title = "Occurence over months",
+       x = "Month", y = "Number of observations") +
+  theme_classic() 
+```
+
+### Seasonal occurance
+
+```{r}
+dat %>%
+  filter(!is.na(month)) %>% 
+  group_by(season) %>%
+  summarise(n = length(basisOfRecord)) %>% 
+  ggplot(aes(x = season, y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = n), position = position_dodge(width = 0.9), vjust = -0.25) +
+  labs(title = "Occurence over seasons",
+       x = "Season", y = "Number of observations") +
+  theme_classic() 
+```
+
+### Yearly occurance
+
+```{r}
+dat %>%
+  filter(!is.na(year)) %>% 
+  group_by(year) %>%
+  summarise(n = length(basisOfRecord)) %>% 
+  ggplot(aes(x = year, y = n)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  labs(title = "Occurence over years",
+       x = "Year", y = "Number of observations") +
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  theme_classic() 
+```
+
+## Maps {.tabset .tabset-fade .tabset-pills}
+
+```{r}
+oz_states <-  ozmaps::ozmap_states
+dat.season <- dat %>% filter(!is.na(season)) # plot points that have season info
+```
+
+
+
+### Without Jervis Bay
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 149.5), y = c(-36, -35.1)) +
+  geom_point(
+    data = dat.season,
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+### With Jervis Bay
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 150.8), y = c(-36, -35.1)) +
+  geom_point(
+    data = dat.season,
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+### Only Jervis Bay
+
+Some points on the sea. Might need to check the original data.
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(150.55, 150.8), y = c(-35.22, -35.1)) +
+  geom_point(
+    data = dat.season,
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+# Records over seasons
+
+From the exploration above, I am interested in investigating the association between occurrence and season. 
+
+Here, I would also like to look into if there is any difference in this pattern between families.
+
+```{r, message=FALSE}
+dat.season %>% 
+  filter(!family == "") %>% 
+  group_by(season, family) %>%
+  summarise(n = length(basisOfRecord)) %>% 
+  ggplot(aes(x = season, y = family, fill = log(n))) +
+  geom_tile(color = "white", linewidth = .5, linetype = 1) +
+  labs(title = "Reocrds in different families in different seasons",
+       subtitle = "colour shows the record numbers",
+       x = "Season", y = "Family") +
+  theme_classic() 
+```
+_The blanks on the heatmap for Varanidae and Diplodactylidae due to the lack of records in winter._
+
+_Number of records are natural log transformed to provide clearer visualisation._
+
+From this figure, most families are observed more often during spring and summer.
+
+# Spatial and temperal distribution
+
+From the heatmap above, Scincidae, Elapidae and Agamidae have pretty seasonal seasonal records while Gekkonidae, Cheloniidae and Pythonidae have little seasonality. Here, I break it down into months to see their monthly occurrence.
+
+## Seasonal records
+
+```{r, warning=FALSE, message=FALSE}
+dat.season %>% 
+  filter(family %in% c("Scincidae", "Elapidae", "Agamidae", "Gekkonidae", "Cheloniidae", "Pythonidae") & !family == "") %>% 
+  group_by(month, family) %>%
+  summarise(n = length(basisOfRecord)) %>% 
+  mutate(seasonality = case_when(
+    family %in% c("Scincidae", "Elapidae", "Agamidae") ~ "seasonal",
+    family %in% c("Gekkonidae", "Cheloniidae", "Pythonidae") ~ "constant")) %>% 
+  ggplot(aes(x = month, y = family, fill = log(n))) +
+  geom_tile(color = "white", linewidth = .5, linetype = 1) +
+  facet_grid(seasonality ~., scales = "free", space = "free") +
+  labs(title = "Reocrds over monthsin different families with varied seasonal pattern",
+       subtitle = "colour shows the record numbers",
+       x = "Season", y = "Family") +
+  theme_classic() 
+```
+
+## Seasonal distribution {.tabset .tabset-fade .tabset-pills}
+
+Other than temporal variation, I wonder if spatial distribution also varies with seasonality. Here, I use only the families selected from the above.
+
+For convenience, here I exclude those in Jervis Bay.
+
+```{r}
+dat.season$month <- factor(dat.season$month, levels = c(12, 1:11))
+```
+
+### All families 
+
+```{r, warning=FALSE}
+dat.season$month <- factor(dat.season$month, levels = c(12, 1:11))
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 149.5), y = c(-36, -35.1)) +
+  scale_x_continuous(guide = guide_axis(angle = 90)) +
+  geom_point(
+    data = dat.season,
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  facet_wrap(~ month, ncol = 6) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+### Seasonal families {.tabset .tabset-fade .tabset-pills}
+
+Season families expand their range during warmer seasons.       
+
+#### Scincidae
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 149.5), y = c(-36, -35.1)) +
+  scale_x_continuous(guide = guide_axis(angle = 90)) +
+  geom_point(
+    data = dat.season %>% filter(family == "Scincidae"),
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  facet_wrap(~ month, ncol = 6) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+#### Elapidae
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 149.5), y = c(-36, -35.1)) +
+  scale_x_continuous(guide = guide_axis(angle = 90)) +
+  geom_point(
+    data = dat.season %>% filter(family == "Elapidae"),
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  facet_wrap(~ month, ncol = 6) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+#### Agamidae
+
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 149.5), y = c(-36, -35.1)) +
+  scale_x_continuous(guide = guide_axis(angle = 90)) +
+  geom_point(
+    data = dat.season %>% filter(family == "Agamidae"),
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  facet_wrap(~ month, ncol = 6) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
+
+
+### Constant families {.tabset .tabset-fade .tabset-pills}
+
+Here I do not plot the family Cheloniidae and Pythonidae because they have relatively low record numbers (`r nrow(dat %>% filter(family == "Cheloniidae"))` and `r nrow(dat %>% filter(family == "Pythonidae"))` records, repectively).
+
+From Gekkonidae, it looks like the distribution still quite restricted regardless of the season. However, this could also be because of the relatively low records (`r nrow(dat %>% filter(family == "Gekkonidae"))`) in this family and lower number of species (`r dat %>% filter(family == "Gekkonidae") %>% filter(!species == "") %>% distinct(species) %>% nrow()`) compared with seasonal families. For example, Scincidae has `r dat %>% filter(family == "Scincidae") %>% filter(!species == "") %>% distinct(species) %>% nrow()` species and `r nrow(dat %>% filter(family == "Scincidae"))` records.
+
+#### Gekkonidae 
+```{r, warning=FALSE}
+ggplot(oz_states) +
+  geom_sf() +
+  coord_sf(x = c(148.6, 149.5), y = c(-36, -35.1)) +
+  scale_x_continuous(guide = guide_axis(angle = 90)) +
+  geom_point(
+    data = dat.season %>% filter(family == "Gekkonidae"),
+    aes(x = decimalLongitude, y = decimalLatitude, colour = season),
+    alpha = 0.5) +
+  facet_wrap(~ month, ncol = 6) +
+  xlab("Latitude") + 
+  ylab("Longitude") +
+  theme_bw()
+```
