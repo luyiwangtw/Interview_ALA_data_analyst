@@ -208,6 +208,8 @@ dat.season %>%
        x = "Season", y = "Family") +
   theme_classic() 
 ```
+
+
 _The blanks on the heatmap for Varanidae and Diplodactylidae due to the lack of records in winter._
 
 _Number of records are natural log transformed to provide clearer visualisation._
@@ -260,8 +262,8 @@ ggplot(oz_states) +
     aes(x = decimalLongitude, y = decimalLatitude, colour = season),
     alpha = 0.5) +
   facet_wrap(~ month, ncol = 6) +
-  xlab("Latitude") + 
-  ylab("Longitude") +
+  labs(title = "Geographical distribution of records in each month",
+       x = "Latitude", y = "Longitude") +
   theme_bw()
 ```
 
@@ -280,8 +282,8 @@ ggplot(oz_states) +
     aes(x = decimalLongitude, y = decimalLatitude, colour = season),
     alpha = 0.5) +
   facet_wrap(~ month, ncol = 6) +
-  xlab("Latitude") + 
-  ylab("Longitude") +
+  labs(title = "Geographical distribution of records in each month",
+       x = "Latitude", y = "Longitude") +
   theme_bw()
 ```
 
@@ -296,8 +298,8 @@ ggplot(oz_states) +
     aes(x = decimalLongitude, y = decimalLatitude, colour = season),
     alpha = 0.5) +
   facet_wrap(~ month, ncol = 6) +
-  xlab("Latitude") + 
-  ylab("Longitude") +
+  labs(title = "Geographical distribution of records in each month",
+       x = "Latitude", y = "Longitude") +
   theme_bw()
 ```
 
@@ -313,8 +315,8 @@ ggplot(oz_states) +
     aes(x = decimalLongitude, y = decimalLatitude, colour = season),
     alpha = 0.5) +
   facet_wrap(~ month, ncol = 6) +
-  xlab("Latitude") + 
-  ylab("Longitude") +
+  labs(title = "Geographical distribution of records in each month",
+       x = "Latitude", y = "Longitude") +
   theme_bw()
 ```
 
@@ -336,7 +338,7 @@ ggplot(oz_states) +
     aes(x = decimalLongitude, y = decimalLatitude, colour = season),
     alpha = 0.5) +
   facet_wrap(~ month, ncol = 6) +
-  xlab("Latitude") + 
-  ylab("Longitude") +
+  labs(title = "Geographical distribution of records in each month",
+       x = "Latitude", y = "Longitude") +
   theme_bw()
 ```
