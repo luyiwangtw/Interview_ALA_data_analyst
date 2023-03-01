@@ -11,6 +11,7 @@ subtitle: Techanical test
 knit: (function(inputFile, encoding) {
   rmarkdown::render(inputFile, encoding = encoding, output_dir = "../docs") })
 ---
+View GitHub repo [here](https://github.com/luyiwangtw/Interview_ALA_data_analyst)
 
 ```{r Load R libraries, include = FALSE}
 library(xaringanExtra) # for the clipboard
